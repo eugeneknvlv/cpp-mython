@@ -7,6 +7,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <unordered_map>
 
 namespace parse {
 
@@ -111,6 +112,26 @@ namespace parse {
         using std::runtime_error::runtime_error;
     };
 
+    const std::unordered_map<std::string, Token> str_to_token =
+    {
+        {"class"s, token_type::Class()},
+        {"return"s, token_type::Return()},
+        {"if"s, token_type::If()},
+        {"else"s, token_type::Else()},
+        {"def"s, token_type::Def()},
+        {"print"s, token_type::Print()},
+        {"and"s, token_type::And()},
+        {"or"s, token_type::Or()},
+        {"not"s, token_type::Not()},
+        {"<="s, token_type::LessOrEq()},
+        {">="s, token_type::GreaterOrEq()},
+        {"=="s, token_type::Eq()},
+        {"!="s, token_type::NotEq()},
+        {"None", token_type::None()},
+        {"True"s, token_type::True()},
+        {"False"s, token_type::False()}
+    };
+
     class Lexer {
     public:
         explicit Lexer(std::istream& input);
@@ -125,7 +146,6 @@ namespace parse {
         // В противном случае метод выбрасывает исключение LexerError
         template <typename T>
         const T& Expect() const {
-            using namespace std::literals;
             if (!curr_token_.Is<T>()) {
                 throw LexerError("Not implemented"s);
             }
@@ -136,7 +156,6 @@ namespace parse {
         // В противном случае метод выбрасывает исключение LexerError
         template <typename T, typename U>
         void Expect(const U& value) const {
-            using namespace std::literals;
             if (!curr_token_.Is<T>()) {
                 throw LexerError("Not implemented"s);
             }
@@ -149,7 +168,6 @@ namespace parse {
         // В противном случае метод выбрасывает исключение LexerError
         template <typename T>
         const T& ExpectNext() {
-            using namespace std::literals;
             curr_token_ = NextToken();
             if (!curr_token_.Is<T>()) {
                 throw LexerError("Not implemented"s);
@@ -161,7 +179,6 @@ namespace parse {
         // В противном случае метод выбрасывает исключение LexerError
         template <typename T, typename U>
         void ExpectNext(const U& value) {
-            using namespace std::literals;
             curr_token_ = NextToken();
             if (!curr_token_.Is<T>()) {
                 throw LexerError("Not implemented"s);
@@ -178,9 +195,18 @@ namespace parse {
         size_t curr_indent_;
         std::string curr_line_;
         bool first_line_;
-        bool new_line_;
+        bool processed_indents_dedents_;
         bool dedented_before_eof_;
 
+        void ProcessNoMoreInput();
+        bool CurrLineIsCommentedOrEmpty();
+        void ProcessEmptyOrCommentedLine();
+        std::string GetNewLexem();
+        void ProcessString();
+        void ProcessSingleIndentDedent();
+        bool LexemIsId(const std::string& lexem);
+        bool LexemIsNumber(const std::string& lexem);
+        bool LexemIsCommented(const std::string& lexem);
         std::string ParseString();
     };
 }  // namespace parse

@@ -8,7 +8,6 @@
 #include <optional>
 
 namespace runtime {
-
     // Контекст исполнения инструкций Mython
     class Context {
     public:

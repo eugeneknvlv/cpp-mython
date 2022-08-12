@@ -131,7 +131,6 @@ print y.value
 int main() {
     try {
         TestAll();
-
         RunMythonProgram(cin, cout);
     }
     catch (const std::exception& e) {

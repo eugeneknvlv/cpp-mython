@@ -8,6 +8,12 @@
 using namespace std;
 
 namespace runtime {
+    namespace {
+        const std::string INIT_METHOD = "__init__"s;
+        const std::string STR_METHOD = "__str__"s;
+        const std::string LT_METHOD = "__lt__"s;
+        const std::string EQ_METHOD = "__eq__"s;
+    }
 
     ObjectHolder::ObjectHolder(std::shared_ptr<Object> data)
         : data_(std::move(data)) {
@@ -67,8 +73,8 @@ namespace runtime {
     }
 
     void ClassInstance::Print(std::ostream& os, Context& context) {
-        if (HasMethod("__str__"s, 0)) {
-            ObjectHolder str_result = Call("__str__"s, {}, context);
+        if (HasMethod(STR_METHOD, 0)) {
+            ObjectHolder str_result = Call(STR_METHOD, {}, context);
             str_result->Print(os, context);
         }
         else {
@@ -175,20 +181,8 @@ namespace runtime {
         os << (GetValue() ? "True"sv : "False"sv);
     }
 
-    bool Equal(const ObjectHolder& lhs, const ObjectHolder& rhs, [[maybe_unused]] Context& context) {
-        if (!lhs) {
-            if (!rhs) {
-                return true;
-            }
-            throw std::runtime_error("Cannot compare objects for equality"s);
-        }
-        if (!rhs) {
-            if (!lhs) {
-                return true;
-            }
-            throw std::runtime_error("Cannot compare objects for equality"s);
-        }
-
+    template <typename Comparator>
+    bool Compare(const ObjectHolder& lhs, const ObjectHolder& rhs, Context& context, Comparator cmp) {
         Number* lhs_num = lhs.TryAs<Number>();
         String* lhs_str = lhs.TryAs<String>();
         Bool* lhs_boolean = lhs.TryAs<Bool>();
@@ -198,24 +192,24 @@ namespace runtime {
             if (!rhs_num) {
                 throw std::runtime_error("Cannot compare objects for equality"s);
             }
-            return lhs_num->GetValue() == rhs_num->GetValue();
+            return cmp(lhs_num->GetValue(), rhs_num->GetValue());
         }
         else if (lhs_str) {
             String* rhs_str = rhs.TryAs<String>();
             if (!rhs_str) {
                 throw std::runtime_error("Cannot compare objects for equality"s);
             }
-            return lhs_str->GetValue() == rhs_str->GetValue();
+            return cmp(lhs_str->GetValue(), rhs_str->GetValue());
         }
         else if (lhs_boolean) {
             Bool* rhs_boolean = rhs.TryAs<Bool>();
             if (!rhs_boolean) {
                 throw std::runtime_error("Cannot compare objects for equality"s);
             }
-            return lhs_boolean->GetValue() == rhs_boolean->GetValue();
+            return cmp(lhs_boolean->GetValue(), rhs_boolean->GetValue());
         }
         else if (lhs_class_inst) {
-            if (!lhs_class_inst->HasMethod("__eq__"s, 1)) {
+            if (!lhs_class_inst->HasMethod((cmp(0, 0) ? EQ_METHOD : LT_METHOD), 1)) {
                 throw std::runtime_error("Cannot compare objects for equality"s);
             }
 
@@ -225,54 +219,27 @@ namespace runtime {
             }
 
             DummyContext context;
-            return IsTrue(lhs_class_inst->Call("__eq__"s, { ObjectHolder::Share(*rhs_class_inst) }, context));
+            return IsTrue(lhs_class_inst->Call((cmp(0, 0) ? EQ_METHOD : LT_METHOD),
+                         { ObjectHolder::Share(*rhs_class_inst) }, context));
         }
         return false;
+    }
+
+    bool Equal(const ObjectHolder& lhs, const ObjectHolder& rhs, [[maybe_unused]] Context& context) {
+        if (!lhs && !rhs) {
+            return true;
+        }
+        else if (!lhs || !rhs) {
+            throw std::runtime_error("Cannot compare objects for equality"s);
+        }
+        return Compare(lhs, rhs, context, std::equal_to<>());
     }
 
     bool Less(const ObjectHolder& lhs, const ObjectHolder& rhs, [[maybe_unused]] Context& context) {
         if (!lhs || !rhs) {
             throw std::runtime_error("Cannot compare objects for equality"s);
         }
-        Number* lhs_num = lhs.TryAs<Number>();
-        String* lhs_str = lhs.TryAs<String>();
-        Bool* lhs_boolean = lhs.TryAs<Bool>();
-        ClassInstance* lhs_class_inst = lhs.TryAs<ClassInstance>();
-        if (lhs_num) {
-            Number* rhs_num = rhs.TryAs<Number>();
-            if (!rhs_num) {
-                throw std::runtime_error("Cannot compare objects for equality"s);
-            }
-            return lhs_num->GetValue() < rhs_num->GetValue();
-        }
-        else if (lhs_str) {
-            String* rhs_str = rhs.TryAs<String>();
-            if (!rhs_str) {
-                throw std::runtime_error("Cannot compare objects for equality"s);
-            }
-            return lhs_str->GetValue() < rhs_str->GetValue();
-        }
-        else if (lhs_boolean) {
-            Bool* rhs_boolean = rhs.TryAs<Bool>();
-            if (!rhs_boolean) {
-                throw std::runtime_error("Cannot compare objects for equality"s);
-            }
-            return lhs_boolean->GetValue() < rhs_boolean->GetValue();
-        }
-        else if (lhs_class_inst) {
-            if (!lhs_class_inst->HasMethod("__eq__"s, 1)) {
-                throw std::runtime_error("Cannot compare objects for equality"s);
-            }
-
-            ClassInstance* rhs_class_inst = rhs.TryAs<ClassInstance>();
-            if (!rhs_class_inst) {
-                throw std::runtime_error("Cannot compare objects for equality"s);
-            }
-
-            DummyContext context;
-            return IsTrue(lhs_class_inst->Call("__lt__"s, { ObjectHolder::Share(*rhs_class_inst) }, context));
-        }
-        return false;
+        return Compare(lhs, rhs, context, std::less<>());
     }
 
     bool NotEqual(const ObjectHolder& lhs, const ObjectHolder& rhs, Context& context) {

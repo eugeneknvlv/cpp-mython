@@ -147,7 +147,7 @@ namespace ast {
             return ObjectHolder::Own(runtime::String{ string(lhs_string->GetValue()) + string(rhs_string->GetValue()) });
         }
         else if (lhs_cls_inst) {
-            return lhs_cls_inst->Call("__add__"s, { rhs_->Execute(closure, context) }, context);
+            return lhs_cls_inst->Call(ADD_METHOD, { rhs_->Execute(closure, context) }, context);
         }
 
         throw runtime_error("Addition error"s);
@@ -292,12 +292,12 @@ namespace ast {
     ObjectHolder NewInstance::Execute(Closure& closure, Context& context) {
         ObjectHolder cls_inst_OH = ObjectHolder::Own(runtime::ClassInstance(cls_));
         runtime::ClassInstance* cls_inst_ptr_ = cls_inst_OH.TryAs<runtime::ClassInstance>();
-        if (cls_inst_ptr_->HasMethod("__init__"s, args_.size())) {
+        if (cls_inst_ptr_->HasMethod(INIT_METHOD, args_.size())) {
             vector<ObjectHolder> actual_args;
             for (const auto& stmt : args_) {
                 actual_args.push_back(stmt->Execute(closure, context));
             }
-            cls_inst_ptr_->Call("__init__"s, actual_args, context);
+            cls_inst_ptr_->Call(INIT_METHOD, actual_args, context);
         }
         return cls_inst_OH;
     }
